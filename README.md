@@ -81,7 +81,13 @@ lunar_lander/
 ```
 
 ---
+## Demo Videos
 
+### Video 1
+[Watch Video 1](videos/before chanegs.mp4)
+
+### Video 2
+[Watch Video 2](videos/after changes.mp4)
 ## Submission Checklist
 
 Submission is only the following three things:
