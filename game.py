@@ -4,14 +4,27 @@ import pygame
 
 WIDTH, HEIGHT = 800, 600
 STEP = 20
-THRUST, ROTATE_SPEED, BURN_RATE, FUEL_MAX = 60.0, 2.4, 22.0, 300.0
-MAX_SPEED_X, MAX_SPEED_Y, MAX_ANGLE = 25.0, 40.0, 0.25
+
+THRUST = 60.0
+ROTATE_SPEED = 2.4
+BURN_RATE = 22.0
+FUEL_MAX = 300.0
+
+MAX_SPEED_X = 25.0
+MAX_SPEED_Y = 40.0
+MAX_ANGLE = 0.25
+
 FOOT = 12
 
 
 def ship_color(fuel_ratio):
-    """Return an (r, g, b) hull colour for the given fuel ratio."""
-    return None
+    """Return a hull colour based on remaining fuel."""
+    if fuel_ratio > 0.66:
+        return (230, 230, 240)
+    elif fuel_ratio > 0.33:
+        return (240, 200, 100)
+    else:
+        return (240, 120, 100)
 
 
 def on_landing(score):
@@ -25,7 +38,8 @@ def bonus_life_threshold():
 
 
 def make_terrain():
-    heights, y = [], random.randint(430, 520)
+    heights = []
+    y = random.randint(430, 520)
 
     for _ in range(WIDTH // STEP + 1):
         y = max(380, min(560, y + random.randint(-32, 32)))
@@ -54,8 +68,10 @@ def make_terrain():
 
 def ground_y(heights, x):
     x = max(0, min(WIDTH - 1, x))
+
     i = int(x // STEP)
     t = (x - i * STEP) / STEP
+
     return heights[i] * (1 - t) + heights[i + 1] * t
 
 
@@ -74,26 +90,42 @@ class Game:
         self.score = 0
         self.lives = 3
         self.bonus_awarded = 0
+
         self.new_round()
 
     def new_round(self):
         self.heights, self.pads = make_terrain()
-        self.pos = pygame.Vector2(random.randint(100, 700), 70)
-        self.vel = pygame.Vector2(random.uniform(-20, 20), 0)
+
+        self.pos = pygame.Vector2(
+            random.randint(100, 700),
+            70
+        )
+
+        self.vel = pygame.Vector2(
+            random.uniform(-20, 20),
+            0
+        )
+
         self.angle = 0.0
         self.fuel = FUEL_MAX
         self.thrusting = False
+
         self.state = "fly"
         self.message = ""
 
     def pad_under(self):
         for x1, x2, y, mult in self.pads:
-            if x1 <= self.pos.x - 8 and self.pos.x + 8 <= x2:
+
+            if (
+                x1 <= self.pos.x - 8
+                and self.pos.x + 8 <= x2
+            ):
                 return (x1, x2, y, mult)
 
         return None
 
     def touchdown(self):
+
         pad = self.pad_under()
         angle = wrap_angle(self.angle)
 
@@ -104,16 +136,21 @@ class Game:
             and abs(self.vel.y) <= MAX_SPEED_Y
             and abs(angle) <= MAX_ANGLE
         ):
-            earned = int((100 + self.fuel) * pad[3])
+
+            earned = int(
+                (100 + self.fuel) * pad[3]
+            )
 
             self.score += earned
             self.state = "landed"
+
             self.message = (
-                f"Perfect landing! +{earned}  "
+                f"Perfect landing! +{earned} "
                 "(Space = next level)"
             )
 
             on_landing(earned)
+
             return
 
         # Crash
@@ -122,13 +159,15 @@ class Game:
 
         if pad is None:
             reason = "missed the pad"
+
         elif abs(angle) > MAX_ANGLE:
             reason = "bad angle"
+
         else:
             reason = "too fast"
 
         self.message = (
-            f"Crashed: {reason}!  "
+            f"Crashed: {reason}! "
             + (
                 "Space = retry"
                 if self.lives > 0
@@ -137,24 +176,38 @@ class Game:
         )
 
     def update(self, dt, keys):
+
         if self.state != "fly":
             return
 
+        # Bonus life system
         threshold = bonus_life_threshold()
 
-        if threshold and self.score // threshold > self.bonus_awarded:
-            self.bonus_awarded = self.score // threshold
+        if (
+            threshold
+            and self.score // threshold
+            > self.bonus_awarded
+        ):
+
+            self.bonus_awarded = (
+                self.score // threshold
+            )
+
             self.lives += 1
 
+        # Rotation
         self.angle += (
-            keys[pygame.K_RIGHT] - keys[pygame.K_LEFT]
+            keys[pygame.K_RIGHT]
+            - keys[pygame.K_LEFT]
         ) * ROTATE_SPEED * dt
 
+        # Gravity
         gravity = pygame.Vector2(
             0,
             16 + 2 * self.level
         )
 
+        # Thrust
         self.thrusting = (
             bool(keys[pygame.K_UP])
             and self.fuel > 0
@@ -163,12 +216,14 @@ class Game:
         acceleration = gravity
 
         if self.thrusting:
+
+            thrust_vector = pygame.Vector2(
+                math.sin(self.angle),
+                -math.cos(self.angle)
+            ) * THRUST
+
             acceleration = (
-                gravity
-                + pygame.Vector2(
-                    math.sin(self.angle),
-                    -math.cos(self.angle),
-                ) * THRUST
+                gravity + thrust_vector
             )
 
             self.fuel = max(
@@ -176,19 +231,31 @@ class Game:
                 self.fuel - BURN_RATE * dt
             )
 
+        # Physics
         self.vel += acceleration * dt
         self.pos += self.vel * dt
 
+        # Wrap horizontally
         self.pos.x %= WIDTH
-        self.pos.y = max(-200, self.pos.y)
 
-        if self.pos.y + FOOT >= ground_y(
-            self.heights,
-            self.pos.x
+        # Prevent going too far above screen
+        self.pos.y = max(
+            -200,
+            self.pos.y
+        )
+
+        # Ground collision
+        if (
+            self.pos.y + FOOT
+            >= ground_y(
+                self.heights,
+                self.pos.x
+            )
         ):
             self.touchdown()
 
     def ship_points(self):
+
         cos = math.cos(self.angle)
         sin = math.sin(self.angle)
 
@@ -200,24 +267,37 @@ class Game:
 
         return [
             (
-                self.pos.x + x * cos - y * sin,
-                self.pos.y + x * sin + y * cos,
+                self.pos.x
+                + x * cos
+                - y * sin,
+
+                self.pos.y
+                + x * sin
+                + y * cos,
             )
             for x, y in local
         ]
 
     def draw(self, screen):
-        screen.fill((8, 8, 20))
 
+        # Background
+        screen.fill(
+            (8, 8, 20)
+        )
+
+        # Terrain
         points = [
             (i * STEP, h)
-            for i, h in enumerate(self.heights)
+            for i, h in enumerate(
+                self.heights
+            )
         ]
 
         pygame.draw.polygon(
             screen,
             (70, 70, 85),
-            points + [
+            points
+            + [
                 (WIDTH, HEIGHT),
                 (0, HEIGHT),
             ],
@@ -233,6 +313,7 @@ class Game:
 
         # Landing pads
         for x1, x2, y, mult in self.pads:
+
             pygame.draw.line(
                 screen,
                 (90, 230, 120),
@@ -260,22 +341,44 @@ class Game:
         # Lander
         if self.state != "crashed":
 
+            # Engine flame
             if self.thrusting:
-                cos = math.cos(self.angle)
-                sin = math.sin(self.angle)
+
+                cos = math.cos(
+                    self.angle
+                )
+
+                sin = math.sin(
+                    self.angle
+                )
 
                 flame = [
                     (
-                        self.pos.x - 5 * cos - 10 * sin,
-                        self.pos.y - 5 * sin + 10 * cos,
+                        self.pos.x
+                        - 5 * cos
+                        - 10 * sin,
+
+                        self.pos.y
+                        - 5 * sin
+                        + 10 * cos,
                     ),
+
                     (
-                        self.pos.x + 5 * cos - 10 * sin,
-                        self.pos.y + 5 * sin + 10 * cos,
+                        self.pos.x
+                        + 5 * cos
+                        - 10 * sin,
+
+                        self.pos.y
+                        + 5 * sin
+                        + 10 * cos,
                     ),
+
                     (
-                        self.pos.x - 22 * sin,
-                        self.pos.y + 22 * cos,
+                        self.pos.x
+                        - 22 * sin,
+
+                        self.pos.y
+                        + 22 * cos,
                     ),
                 ]
 
@@ -285,11 +388,10 @@ class Game:
                     flame,
                 )
 
-            color = (
-                ship_color(
-                    max(0.0, self.fuel) / FUEL_MAX
-                )
-                or (230, 230, 240)
+            # Ship colour based on fuel
+            color = ship_color(
+                max(0.0, self.fuel)
+                / FUEL_MAX
             )
 
             pygame.draw.polygon(
@@ -299,6 +401,8 @@ class Game:
             )
 
         else:
+
+            # Crash effect
             pygame.draw.circle(
                 screen,
                 (255, 120, 40),
@@ -308,10 +412,22 @@ class Game:
             )
 
         # HUD
-        ok_x = abs(self.vel.x) <= MAX_SPEED_X
-        ok_y = abs(self.vel.y) <= MAX_SPEED_Y
+        ok_x = (
+            abs(self.vel.x)
+            <= MAX_SPEED_X
+        )
+
+        ok_y = (
+            abs(self.vel.y)
+            <= MAX_SPEED_Y
+        )
+
         ok_a = (
-            abs(wrap_angle(self.angle))
+            abs(
+                wrap_angle(
+                    self.angle
+                )
+            )
             <= MAX_ANGLE
         )
 
@@ -323,19 +439,23 @@ class Game:
                 f"Fuel {self.fuel:5.0f}",
                 (240, 240, 240),
             ),
+
             (
                 f"Vx {self.vel.x:6.1f}",
                 good if ok_x else bad,
             ),
+
             (
                 f"Vy {self.vel.y:6.1f}",
                 good if ok_y else bad,
             ),
+
             (
                 f"Angle "
                 f"{math.degrees(wrap_angle(self.angle)):5.0f}",
                 good if ok_a else bad,
             ),
+
             (
                 f"Score {self.score}  "
                 f"Lives {self.lives}  "
@@ -344,17 +464,25 @@ class Game:
             ),
         ]
 
-        for i, (text, color) in enumerate(lines):
+        for i, (text, color) in enumerate(
+            lines
+        ):
+
             screen.blit(
                 self.font.render(
                     text,
                     True,
                     color,
                 ),
-                (10, 8 + i * 22),
+                (
+                    10,
+                    8 + i * 22
+                ),
             )
 
+        # Message
         if self.message:
+
             label = self.font.render(
                 self.message,
                 True,
@@ -373,6 +501,7 @@ class Game:
 
 
 def main():
+
     pygame.init()
 
     screen = pygame.display.set_mode(
@@ -384,7 +513,9 @@ def main():
     )
 
     clock = pygame.time.Clock()
+
     game = Game()
+
     running = True
 
     while running:
@@ -394,40 +525,54 @@ def main():
             0.05,
         )
 
+        # Events
         for event in pygame.event.get():
 
             if event.type == pygame.QUIT:
+
                 running = False
 
             elif event.type == pygame.KEYDOWN:
 
+                # Restart
                 if event.key == pygame.K_r:
+
                     game.reset()
 
+                # Next level after landing
                 elif (
-                    event.key == pygame.K_SPACE
-                    and game.state == "landed"
+                    event.key
+                    == pygame.K_SPACE
+                    and game.state
+                    == "landed"
                 ):
+
                     game.level += 1
                     game.new_round()
 
+                # Retry after crash
                 elif (
-                    event.key == pygame.K_SPACE
-                    and game.state == "crashed"
+                    event.key
+                    == pygame.K_SPACE
+                    and game.state
+                    == "crashed"
                     and game.lives > 0
                 ):
+
                     game.new_round()
 
+        # Update game
         game.update(
             dt,
             pygame.key.get_pressed(),
         )
 
+        # Draw game
         game.draw(screen)
 
         pygame.display.flip()
 
-      pygame.quit()
+    pygame.quit()
 
 
 if __name__ == "__main__":
