@@ -71,7 +71,7 @@ class Game:
                 return (x1, x2, y, mult)
         return None
 
-   def touchdown(self):
+   def touchdown(self)
     pad = self.pad_under()
     angle = wrap_angle(self.angle)
     if pad and abs(self.vel.x) <= MAX_SPEED_X and abs(self.vel.y) <= MAX_SPEED_Y and abs(angle) <= MAX_ANGLE:
