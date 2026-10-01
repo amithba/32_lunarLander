@@ -71,44 +71,88 @@ class Game:
                 return (x1, x2, y, mult)
         return None
 
-   def touchdown(self)
+ def touchdown(self):
     pad = self.pad_under()
     angle = wrap_angle(self.angle)
-    if pad and abs(self.vel.x) <= MAX_SPEED_X and abs(self.vel.y) <= MAX_SPEED_Y and abs(angle) <= MAX_ANGLE:
+
+    if (
+        pad
+        and abs(self.vel.x) <= MAX_SPEED_X
+        and abs(self.vel.y) <= MAX_SPEED_Y
+        and abs(angle) <= MAX_ANGLE
+    ):
         earned = int((100 + self.fuel) * pad[3])
         self.score += earned
-        self.state, self.message = "landed", f"Perfect landing! +{earned}  (Space = next level)"
+        self.state = "landed"
+        self.message = f"Perfect landing! +{earned}  (Space = next level)"
         on_landing(earned)
         return
+
     self.lives -= 1
     self.state = "crashed"
+
     if pad is None:
         reason = "missed the pad"
     elif abs(angle) > MAX_ANGLE:
         reason = "bad angle"
     else:
         reason = "too fast"
-    self.message = f"Crashed: {reason}!  " + ("Space = retry" if self.lives > 0 else "Game over - R = restart")
-    def update(self, dt, keys):
-        if self.state != "fly":
-            return
-        threshold = bonus_life_threshold()
-        if threshold and self.score // threshold > self.bonus_awarded:
-            self.bonus_awarded = self.score // threshold
-            self.lives += 1
-        self.angle += (keys[pygame.K_RIGHT] - keys[pygame.K_LEFT]) * ROTATE_SPEED * dt
-        gravity = pygame.Vector2(0, 16 + 2 * self.level)
-        self.thrusting = bool(keys[pygame.K_UP]) and self.fuel > 0
-        acceleration = gravity
-        if self.thrusting:
-            acceleration = gravity + pygame.Vector2(math.sin(self.angle), -math.cos(self.angle)) * THRUST
-            self.fuel = max(0.0, self.fuel - BURN_RATE * dt)
-        self.vel += acceleration * dt
-        self.pos += self.vel * dt
-        self.pos.x %= WIDTH
-        self.pos.y = max(-200, self.pos.y)
-        if self.pos.y + FOOT >= ground_y(self.heights, self.pos.x):
-            self.touchdown()
+
+    self.message = (
+        f"Crashed: {reason}!  "
+        + (
+            "Space = retry"
+            if self.lives > 0
+            else "Game over - R = restart"
+        )
+    )
+
+
+def update(self, dt, keys):
+    if self.state != "fly":
+        return
+
+    threshold = bonus_life_threshold()
+
+    if threshold and self.score // threshold > self.bonus_awarded:
+        self.bonus_awarded = self.score // threshold
+        self.lives += 1
+
+    self.angle += (
+        keys[pygame.K_RIGHT] - keys[pygame.K_LEFT]
+    ) * ROTATE_SPEED * dt
+
+    gravity = pygame.Vector2(0, 16 + 2 * self.level)
+
+    self.thrusting = bool(keys[pygame.K_UP]) and self.fuel > 0
+
+    acceleration = gravity
+
+    if self.thrusting:
+        acceleration = (
+            gravity
+            + pygame.Vector2(
+                math.sin(self.angle),
+                -math.cos(self.angle)
+            ) * THRUST
+        )
+
+        self.fuel = max(
+            0.0,
+            self.fuel - BURN_RATE * dt
+        )
+
+    self.vel += acceleration * dt
+    self.pos += self.vel * dt
+
+    self.pos.x %= WIDTH
+    self.pos.y = max(-200, self.pos.y)
+
+    if self.pos.y + FOOT >= ground_y(
+        self.heights,
+        self.pos.x
+    ):
+        self.touchdown()
 
     def ship_points(self):
         cos, sin = math.cos(self.angle), math.sin(self.angle)
